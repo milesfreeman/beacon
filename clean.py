@@ -2,6 +2,7 @@
 import sqlite3 as lite
 import glob
 import datetime as dt
+import zipfile
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -12,31 +13,32 @@ num_entries = 0
 dict = {}
 
 def process_entry(entry):
-    global num_entries, cursor, dict
-
-    command = """ INSERT INTO Entries (Id, SrcIP, SrcPort, DestIP, DestPort)
-                  VALUES """
-    command += '(' + str(num_entries) + ', '
-    command += '"' + entry[19][6:] + '", '
-    command += str(entry[20][8:]) + ', '
-    command += '"' + entry[22][6:] + '", '
-    command += str(entry[23][8:]) + ');'
+    global num_entries, cursor,
     num_entries += 1
-
-    destip = entry[27][11:]
-    srcip = entry[19][6:]
-    sentbyte = entry[34][9:]
-    entry_date = map(int, entry[4][5:].split('-'))
-    entry_time = map(int, entry[5][5:].split(':'))
-    date = dt.datetime(entry_date[0], entry_date[1], entry_date[2], entry_time[0], entry_time[1], entry_time[2])
-    if destip in dict:
-        if srcip in dict[destip]:
-            (dict[destip])[srcip].append((num_entries, (dict[destip])[srcip][0][0] - date, sentbyte))
-            (dict[destip])[srcip][0] = (date, (dict[destip])[srcip][0][1] + 1)
+    if cursor:
+        command = """ INSERT INTO Entries (Id, SrcIP, SrcPort, DestIP, DestPort)
+                  VALUES """
+        command += '(' + str(num_entries) + ', '
+        command += '"' + entry[19][6:] + '", '
+        command += str(entry[20][8:]) + ', '
+        command += '"' + entry[22][6:] + '", '
+        command += str(entry[23][8:]) + ');'
+        cursor.execute(command)
+    else :
+        destip = entry[27][11:]
+        srcip = entry[19][6:]
+        sentbyte = entry[34][9:]
+        entry_date = map(int, entry[4][5:].split('-'))
+        entry_time = map(int, entry[5][5:].split(':'))
+        date = dt.datetime(entry_date[0], entry_date[1], entry_date[2], entry_time[0], entry_time[1], entry_time[2])
+        if destip in dict:
+            if srcip in dict[destip]:
+                (dict[destip])[srcip].append((num_entries, (dict[destip])[srcip][0][0] - date, sentbyte))
+                (dict[destip])[srcip][0] = (date, (dict[destip])[srcip][0][1] + 1)
+            else:
+                (dict[destip])[srcip] = [(date, 1), (num_entries, dt.timedelta(), sentbyte)]
         else:
-            (dict[destip])[srcip] = [(date, 1), (num_entries, dt.timedelta(), sentbyte)]
-    else:
-        dict[destip] = {srcip: [(date, 1), (num_entries, dt.timedelta(), sentbyte)]}
+            dict[destip] = {srcip: [(date, 1), (num_entries, dt.timedelta(), sentbyte)]}
 
 
 def process_file(path):
@@ -89,24 +91,24 @@ def analyse_keys():
 
 def main(folder, database):
     global dict
-    # try:
-    #     global cursor
-    #     connection = lite.connect(database)
-    #     cursor = connection.cursor()
-    #     cursor.execute("CREATE TABLE Entries(Id INT, SrcIP VARCHAR(15), SrcPort INT, DestIP VARCHAR(15), DestPort INT)")
-    # except lite.Error, e:
-    #     print('failed to connect to' + database)
-
-    logs = glob.glob(folder + '/*.csv')
-    for log in logs:
-        print(log)
-        process_file(log)
-        break;
-
-    analyse_keys()
-    # if connection:
-    #     connection.commit()
-    #     connection.close()
-
-
-main('/users/miles/desktop/beacon', None)
+    if database:
+        try:
+            global cursor
+            connection = lite.connect(database)
+            cursor = connection.cursor()
+            cursor.execute("CREATE TABLE Entries(Id INT, SrcIP VARCHAR(15), SrcPort INT, DestIP VARCHAR(15), DestPort INT)")
+        except lite.Error, e:
+            print('failed to connect to' + database)
+    zips = glob.glob(folder + '/*.zip')
+    for zip in zips:
+        with ZipFile(zip) as z:
+            logs = z.namelist()
+            for log in logs:
+                print('Reading ' + log)
+                process_file(log)
+            z.close()
+    if !database:
+        analyse_keys()
+    else:
+        connection.commit()
+        connection.close()
