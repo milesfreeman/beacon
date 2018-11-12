@@ -107,7 +107,7 @@ def main(folder, database):
                 print('Reading ' + log)
                 process_file(log)
             z.close()
-    if !database:
+    if not database:
         analyse_keys()
     else:
         connection.commit()
